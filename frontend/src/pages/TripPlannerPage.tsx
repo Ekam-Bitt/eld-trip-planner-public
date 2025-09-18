@@ -58,7 +58,13 @@ export default function TripPlannerPage() {
   const [saving, setSaving] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualModal, setManualModal] = useState<
-    | { open: true; status: LogStatus; defaultActivity: string; defaultTime: string; defaultDate?: string }
+    | {
+        open: true;
+        status: LogStatus;
+        defaultActivity: string;
+        defaultTime: string;
+        defaultDate?: string;
+      }
     | { open: false }
   >({ open: false });
   const [pending, setPending] = useState<{ timestamp: string; status: LogStatus }[]>([]);
@@ -217,7 +223,9 @@ export default function TripPlannerPage() {
       try {
         // Best-effort refresh of dashboard stats
         await api("/api/drivers/dashboard/");
-      } catch {}
+      } catch (e) {
+        console.debug("Dashboard refresh failed (non-fatal)", e);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
