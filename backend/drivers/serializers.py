@@ -107,6 +107,27 @@ class DriverProfileUpdateSerializer(serializers.Serializer):
                 setattr(instance, field, validated_data[field])
                 update_fields.append(field)
 
+        # Sync critical fields into related DriverProfile for trip checks
+        profile = getattr(instance, "profile", None)
+        if profile is None:
+            try:
+                profile = DriverProfile.objects.create(driver=instance)
+            except Exception:
+                profile = None
+        if profile is not None:
+            prof_changed = False
+            if "license_state" in validated_data:
+                profile.license_state = (validated_data.get("license_state") or "").strip()[:2]
+                prof_changed = True
+            if "time_zone" in validated_data and validated_data.get("time_zone"):
+                profile.time_zone = str(validated_data.get("time_zone"))
+                prof_changed = True
+            if "units" in validated_data and validated_data.get("units"):
+                profile.units = "MILES" if validated_data.get("units") == "miles" else "KM"
+                prof_changed = True
+            if prof_changed:
+                profile.save()
+
         if update_fields:
             instance.save(update_fields=update_fields)
         return instance
