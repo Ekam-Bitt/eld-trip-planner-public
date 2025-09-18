@@ -10,3 +10,4 @@ polyline>=2,<3
 reportlab>=4,<5
 # Pin WeasyPrint to a Python 3.13-compatible release
 weasyprint==61.2
+gunicorn>=22,<23
