@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { TripsAPI } from "../api";
+import { TripsAPI, api } from "../api";
 import MapDisplay from "../components/MapDisplay";
 import DirectionsSidebar from "../components/DirectionsSidebar";
 import LogGraph from "../components/LogGraph";
@@ -214,6 +214,10 @@ export default function TripPlannerPage() {
       setTrip(detail);
       const logList = await LogsAPI.list(detail.id);
       setLogs(logList);
+      try {
+        // Best-effort refresh of dashboard stats
+        await api("/api/drivers/dashboard/");
+      } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }

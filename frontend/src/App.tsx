@@ -121,7 +121,7 @@ export default function App() {
             </Routes>
           </div>
         </main>
-        <ToastContainer position="top-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick pauseOnHover theme="dark" />
+        <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick pauseOnHover theme="dark" />
         <footer className="py-4 text-center text-sm text-gray-500 bg-slate-800 border-t border-slate-700">
           © {new Date().getFullYear()} ELD Trip Planner
         </footer>

@@ -104,10 +104,7 @@ export default function TripDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [t, e] = await Promise.all([
-        TripsAPI.detail(tripId),
-        LogsAPI.list(tripId),
-      ]);
+      const [t, e] = await Promise.all([TripsAPI.detail(tripId), LogsAPI.list(tripId)]);
       setTrip(t);
       setEvents(e);
       const xt = t as ExtendedTrip;
@@ -191,6 +188,7 @@ export default function TripDetailPage() {
   async function exportPdfWithGraphs() {
     setError(null);
     try {
+      toast.info("Preparing PDF…", { autoClose: 1500 });
       console.log("=== Simplified PDF Export ===");
 
       // Find any SVG on the page (simplified approach)
@@ -278,14 +276,11 @@ export default function TripDetailPage() {
         <Link to="/trips">← Back to Trips</Link>
         <h3 style={{ margin: 0 }}>Trip {tripId}</h3>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button className="btn" onClick={exportPdfWithGraphs}>
-            Export PDF
-          </button>
           <button
-            className="btn"
-            onClick={() => download(ReportsAPI.csvUrl(tripId), `trip_${tripId}.csv`)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow disabled:opacity-50"
+            onClick={exportPdfWithGraphs}
           >
-            Export CSV
+            Export PDF
           </button>
         </div>
       </div>
@@ -330,9 +325,7 @@ export default function TripDetailPage() {
                       type={type}
                       className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white"
                       value={tripHeader[key] || ""}
-                      onChange={(e) =>
-                        setTripHeader((h) => ({ ...h, [key]: e.target.value }))
-                      }
+                      onChange={(e) => setTripHeader((h) => ({ ...h, [key]: e.target.value }))}
                     />
                   </label>
                 ))}
@@ -348,7 +341,8 @@ export default function TripDetailPage() {
             ) : (
               <div className="grid md:grid-cols-4 gap-2 text-sm text-gray-200">
                 <div>
-                  <span className="text-gray-400">Log Date:</span> {(trip as ExtendedTrip).log_date || "—"}
+                  <span className="text-gray-400">Log Date:</span>{" "}
+                  {(trip as ExtendedTrip).log_date || "—"}
                 </div>
                 <div>
                   <span className="text-gray-400">Co-driver:</span>{" "}
@@ -360,7 +354,9 @@ export default function TripDetailPage() {
                 </div>
                 <div>
                   <span className="text-gray-400">Trailer #s:</span>{" "}
-                  {(trip as ExtendedTrip).trailer_numbers || (trip as ExtendedTrip).other_trailers || "—"}
+                  {(trip as ExtendedTrip).trailer_numbers ||
+                    (trip as ExtendedTrip).other_trailers ||
+                    "—"}
                 </div>
                 <div>
                   <span className="text-gray-400">Miles Driving Today:</span>{" "}
@@ -379,7 +375,8 @@ export default function TripDetailPage() {
                   {(trip as ExtendedTrip).commodity_description || "—"}
                 </div>
                 <div>
-                  <span className="text-gray-400">Load ID:</span> {(trip as ExtendedTrip).load_id || "—"}
+                  <span className="text-gray-400">Load ID:</span>{" "}
+                  {(trip as ExtendedTrip).load_id || "—"}
                 </div>
               </div>
             )}
@@ -430,24 +427,9 @@ declare global {
   }
 }
 
-  // Before export, sync window refs to react ref
-  // function syncGraphRefs(ref: React.MutableRefObject<Record<string, SVGSVGElement | null>>) {
-  //   if (typeof window !== "undefined" && window.__dayGraphRefs) {
-  //     ref.current = window.__dayGraphRefs;
-  //   }
-  // }
-
-async function download(url: string, filename: string) {
-  const access = localStorage.getItem("access");
-  const res = await fetch(url, { headers: access ? { Authorization: `Bearer ${access}` } : {} });
-  if (!res.ok) throw new Error(await res.text());
-  const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objectUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(objectUrl);
-}
+// Before export, sync window refs to react ref
+// function syncGraphRefs(ref: React.MutableRefObject<Record<string, SVGSVGElement | null>>) {
+//   if (typeof window !== "undefined" && window.__dayGraphRefs) {
+//     ref.current = window.__dayGraphRefs;
+//   }
+// }
