@@ -1,0 +1,27 @@
+services:
+  backend:
+    image: ghcr.io/ekam-bitt/eld-backend:staging
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings
+      - DEBUG=0
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/ekam-bitt/eld-frontend:staging
+    environment:
+      - VITE_API_URL=/api
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+
