@@ -6,8 +6,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from logs.models import LogEvent
 from drivers.models import DriverProfile
+from logs.models import LogEvent
 
 from .models import Driver
 from .serializers import (
@@ -87,8 +87,11 @@ class DashboardView(APIView):
 
         # Compute "today" and 8-day window in driver's local time, then convert to UTC for queries
         local_now = now + offset
-        local_start_today = datetime(local_now.year, local_now.month, local_now.day, tzinfo=timezone.utc)
-        # local_start_today is a naive midnight in local frame represented as UTC tz-aware at local midnight; convert to UTC boundary by subtracting offset
+        local_start_today = datetime(
+            local_now.year, local_now.month, local_now.day, tzinfo=timezone.utc
+        )
+        # local_start_today is local midnight represented with UTC tzinfo.
+        # Convert to the corresponding UTC boundary by subtracting the offset.
         start_today = (local_start_today - offset).astimezone(timezone.utc)
         start_8_days = start_today - timedelta(days=7)
 
@@ -99,8 +102,12 @@ class DashboardView(APIView):
             .values("day", "timestamp", "status")
         )
 
+        # full_day: if true, compute today's totals using the entire local day window
+        qp = request.query_params
+        full_day = str(qp.get("full_day", "")).lower() in {"1", "true", "yes"}
+
         # Compute hours per status (driver-local day boundaries) and roll-up
-        def compute_hours(ev_list):
+        def compute_hours(ev_list, *, clamp_to_now: bool = True):
             totals = {"OFF": 0.0, "SLEEPER": 0.0, "DRIVING": 0.0, "ON_DUTY": 0.0}
             if not ev_list:
                 return totals
@@ -120,9 +127,9 @@ class DashboardView(APIView):
                 day_local_start = datetime.fromisoformat(f"{day_key}T00:00:00+00:00")
                 day_local_end = datetime.fromisoformat(f"{day_key}T23:59:59.999999+00:00")
                 day_utc_start = (day_local_start - offset).astimezone(timezone.utc)
-                day_utc_end = (day_local_end - offset).astimezone(timezone.utc)
 
-                # Build entries in local frame by shifting timestamps by offset (durations preserved)
+                # Build entries in local frame by shifting timestamps by offset
+                # (durations are preserved)
                 entries_local: list[tuple[datetime, str]] = []
 
                 # Seed with previous status at local midnight if first event is after start
@@ -139,9 +146,12 @@ class DashboardView(APIView):
                 for e in arr_sorted:
                     entries_local.append((e["timestamp"] + offset, e["status"]))
 
-                # Extend to end of local day or local now if today
+                # Extend to end of local day or local now if today (depending on clamp_to_now)
                 local_now_eff = now + offset
-                terminal = day_local_end if day_local_end <= local_now_eff else local_now_eff
+                if clamp_to_now:
+                    terminal = day_local_end if day_local_end <= local_now_eff else local_now_eff
+                else:
+                    terminal = day_local_end
                 if entries_local:
                     entries_local.append((terminal, entries_local[-1][1]))
 
@@ -159,9 +169,9 @@ class DashboardView(APIView):
             return totals
 
         totals_8d = compute_hours(list(events))
-        # Today's subset (driver-local): events with timestamp >= start_today (UTC boundary for local midnight)
+        # Today's subset (driver-local): events >= local midnight (converted to UTC)
         events_today = [e for e in events if e["timestamp"] >= start_today]
-        totals_today = compute_hours(events_today)
+        totals_today = compute_hours(events_today, clamp_to_now=(not full_day))
 
         # HOS caps: 11h driving per day; 14h on-duty window; 70h in 8 days
         driving_left_today = max(0.0, 11.0 - float(totals_today.get("DRIVING", 0.0)))

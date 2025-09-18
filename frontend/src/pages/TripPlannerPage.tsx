@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { TripsAPI, api } from "../api";
+import { TripsAPI, api, type SearchSuggestItem, type SearchSuggestResponse, type SearchRetrieveResponse, type SearchRetrieveFeature } from "../api";
 import MapDisplay from "../components/MapDisplay";
 import DirectionsSidebar from "../components/DirectionsSidebar";
 import LogGraph from "../components/LogGraph";
@@ -31,9 +31,9 @@ function parseCoord(input: string): [number, number] | undefined {
 
 export default function TripPlannerPage() {
   // Default values for quick testing
-  const [currentLocation, setCurrentLocation] = useState("-118.2437,34.0522"); // Los Angeles
-  const [pickupLocation, setPickupLocation] = useState("-115.1398,36.1699"); // Las Vegas
-  const [dropoffLocation, setDropoffLocation] = useState("-104.9903,39.7392"); // Denver
+  const [currentLocation, setCurrentLocation] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [dropoffLocation, setDropoffLocation] = useState("");
   const [currentCycleUsedHrs, setCurrentCycleUsedHrs] = useState("10");
   // Trip-specific header fields
   const [logDate, setLogDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -68,6 +68,97 @@ export default function TripPlannerPage() {
     | { open: false }
   >({ open: false });
   const [pending, setPending] = useState<{ timestamp: string; status: LogStatus }[]>([]);
+
+  const [sessionToken] = useState<string>(() =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2),
+  );
+  const mapboxPublicToken = (import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined) || "";
+  type SearchBoxCore = {
+    suggest: (q: string, opts: { sessionToken: string }) => Promise<SearchSuggestResponse>;
+    retrieve: (id: string, opts: { sessionToken: string }) => Promise<SearchRetrieveResponse>;
+  };
+  const searchCoreRef = useRef<SearchBoxCore | null>(null);
+  const [suggestions, setSuggestions] = useState<{
+    current: SearchSuggestItem[];
+    pickup: SearchSuggestItem[];
+    dropoff: SearchSuggestItem[];
+  }>({ current: [], pickup: [], dropoff: [] });
+  const debounceRef = useRef<number | undefined>(undefined);
+
+  function looksLikeLonLat(s: string): boolean {
+    const parts = s.split(",").map((p) => p.trim());
+    if (parts.length !== 2) return false;
+    const lon = Number(parts[0]);
+    const lat = Number(parts[1]);
+    return Number.isFinite(lon) && Number.isFinite(lat);
+  }
+
+  function scheduleSuggest(kind: "current" | "pickup" | "dropoff", q: string) {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        if (!q || q.length < 3 || looksLikeLonLat(q)) {
+          setSuggestions((s) => ({ ...s, [kind]: [] }));
+          return;
+        }
+        let items: SearchSuggestItem[] = [];
+        if (mapboxPublicToken && (window as unknown as { MapboxSearchBoxCore?: new (opts: unknown) => SearchBoxCore }).MapboxSearchBoxCore) {
+          if (!searchCoreRef.current) {
+            searchCoreRef.current = new (window as unknown as { MapboxSearchBoxCore: new (opts: unknown) => SearchBoxCore }).MapboxSearchBoxCore({
+              accessToken: mapboxPublicToken,
+              options: { flipCoordinates: true },
+            });
+          }
+          const resp = await searchCoreRef.current.suggest(q, { sessionToken });
+          items = Array.isArray(resp?.suggestions) ? resp.suggestions : [];
+        } else {
+          const res: SearchSuggestResponse = await TripsAPI.searchSuggest(q, sessionToken, 5);
+          items = Array.isArray(res.suggestions) ? res.suggestions : [];
+        }
+        setSuggestions((s) => ({ ...s, [kind]: items }));
+      } catch {
+        setSuggestions((s) => ({ ...s, [kind]: [] }));
+      }
+    }, 300) as unknown as number;
+  }
+
+  async function chooseSuggestion(
+    kind: "current" | "pickup" | "dropoff",
+    item: SearchSuggestItem,
+  ) {
+    try {
+      const id = item?.mapbox_id as string;
+      if (!id) return;
+      let center: [number, number] | undefined;
+      let feat: SearchRetrieveFeature | null = null;
+      if (mapboxPublicToken && searchCoreRef.current) {
+        const det = await searchCoreRef.current.retrieve(id, { sessionToken });
+        feat = Array.isArray(det?.features) && det.features.length ? det.features[0] : null;
+        center = feat?.geometry?.coordinates as [number, number] | undefined;
+      } else {
+        const det: SearchRetrieveResponse = await TripsAPI.searchRetrieve(id, sessionToken);
+        feat = Array.isArray(det.features) && det.features.length ? det.features[0] : null;
+        center = feat?.geometry?.coordinates as [number, number] | undefined;
+      }
+      if (Array.isArray(center) && center.length === 2) {
+        const value = `${center[0]},${center[1]}`;
+        if (kind === "current") setCurrentLocation(value);
+        if (kind === "pickup") setPickupLocation(value);
+        if (kind === "dropoff") setDropoffLocation(value);
+      } else {
+        const label = feat?.properties?.name || feat?.properties?.place_name || item.name || item.place_name;
+        if (label) {
+          if (kind === "current") setCurrentLocation(label);
+          if (kind === "pickup") setPickupLocation(label);
+          if (kind === "dropoff") setDropoffLocation(label);
+        }
+      }
+    } finally {
+      setSuggestions((s) => ({ ...s, [kind]: [] }));
+    }
+  }
 
   const combinedEvents = useMemo((): LogEvent[] => {
     const pendAsEvents: LogEvent[] = pending.map((p, idx) => {
@@ -341,22 +432,82 @@ export default function TripPlannerPage() {
         <div className="grid md:grid-cols-3 gap-3">
           <input
             className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Current location (lon,lat)"
+            placeholder="Current location (lon,lat or place name)"
             value={currentLocation}
-            onChange={(e) => setCurrentLocation(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setCurrentLocation(v);
+              scheduleSuggest("current", v);
+            }}
           />
+          {suggestions.current.length > 0 && (
+            <div className="md:col-span-3 -mt-2">
+              <div className="bg-gray-900 border border-gray-700 rounded-lg shadow max-h-56 overflow-auto">
+                {suggestions.current.map((sug) => (
+                  <button
+                    key={sug.mapbox_id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-gray-800"
+                    onClick={() => chooseSuggestion("current", sug)}
+                  >
+                    {sug.name || sug.place_formatted || sug.place_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <input
             className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Pickup (lon,lat)"
+            placeholder="Pickup (lon,lat or place name)"
             value={pickupLocation}
-            onChange={(e) => setPickupLocation(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPickupLocation(v);
+              scheduleSuggest("pickup", v);
+            }}
           />
+          {suggestions.pickup.length > 0 && (
+            <div className="md:col-span-3 -mt-2">
+              <div className="bg-gray-900 border border-gray-700 rounded-lg shadow max-h-56 overflow-auto">
+                {suggestions.pickup.map((sug) => (
+                  <button
+                    key={sug.mapbox_id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-gray-800"
+                    onClick={() => chooseSuggestion("pickup", sug)}
+                  >
+                    {sug.name || sug.place_formatted || sug.place_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <input
             className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Dropoff (lon,lat)"
+            placeholder="Dropoff (lon,lat or place name)"
             value={dropoffLocation}
-            onChange={(e) => setDropoffLocation(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDropoffLocation(v);
+              scheduleSuggest("dropoff", v);
+            }}
           />
+          {suggestions.dropoff.length > 0 && (
+            <div className="md:col-span-3 -mt-2">
+              <div className="bg-gray-900 border border-gray-700 rounded-lg shadow max-h-56 overflow-auto">
+                {suggestions.dropoff.map((sug) => (
+                  <button
+                    key={sug.mapbox_id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-gray-800"
+                    onClick={() => chooseSuggestion("dropoff", sug)}
+                  >
+                    {sug.name || sug.place_formatted || sug.place_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Trip-specific header fields */}

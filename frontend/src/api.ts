@@ -48,6 +48,26 @@ export type TripDetail = {
   created_at: string;
 };
 
+export type SearchSuggestItem = {
+  mapbox_id: string;
+  name?: string;
+  place_formatted?: string;
+  place_name?: string;
+};
+
+export type SearchSuggestResponse = {
+  suggestions: SearchSuggestItem[];
+};
+
+export type SearchRetrieveFeature = {
+  geometry?: { coordinates?: [number, number] };
+  properties?: { name?: string; place_name?: string };
+};
+
+export type SearchRetrieveResponse = {
+  features?: SearchRetrieveFeature[];
+};
+
 export type LogStatus = "OFF" | "SLEEPER" | "DRIVING" | "ON_DUTY";
 
 export type LogEvent = {
@@ -124,6 +144,18 @@ export const TripsAPI = {
   detail: (id: number) => api<TripDetail>(`/api/trips/${id}/`),
   update: (id: number, payload: Record<string, unknown>) => api<TripDetail>(`/api/trips/${id}/`, { method: "PATCH", body: JSON.stringify(payload) }),
   remove: (id: number) => api<void>(`/api/trips/${id}/`, { method: "DELETE" }),
+  searchSuggest: (q: string, sessionToken: string, limit = 5) =>
+    api<SearchSuggestResponse>(
+      `/api/trips/searchbox/suggest/?q=${encodeURIComponent(q)}&session_token=${encodeURIComponent(
+        sessionToken,
+      )}&limit=${limit}`,
+    ),
+  searchRetrieve: (id: string, sessionToken: string) =>
+    api<SearchRetrieveResponse>(
+      `/api/trips/searchbox/retrieve/?id=${encodeURIComponent(id)}&session_token=${encodeURIComponent(
+        sessionToken,
+      )}`,
+    ),
 };
 
 export const LogsAPI = {

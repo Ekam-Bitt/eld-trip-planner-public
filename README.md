@@ -1,40 +1,56 @@
-## ELD Trip Planner
+# ELD Trip & HOS Compliance System
 
-Monorepo for planning and visualizing ELD trips. Backend is a Django REST API with JWT auth; frontend is a React + TypeScript app (Vite) that renders routes and guidance.
+A full‑stack web application that helps truck drivers plan trips, stay FMCSA Hours of Service (HOS) compliant, and generate shareable reports. Backend is a Django REST API with JWT auth; frontend is a React + TypeScript (Vite) app that renders routes and guidance.
+
+### Live App
+[ekam-bitt.github.io/eld-trip-planner-public/](https://ekam-bitt.github.io/eld-trip-planner-public/)
 
 ### Features
 
-- Authentication with JWT (signup, login, logout, profile)
-- Trip planning via Mapbox Directions with polyline decoding to GeoJSON
-- Route polyline rendering and step-by-step directions in the UI
-- Fuel stop estimation along the route
-- API schema and Swagger UI
+- **Authentication (JWT)**: Signup, login, logout, and driver profile management
+- **Trip Planning**: Compute routes via Mapbox Directions; render polyline and key markers
+- **Search**: Suggest and retrieve places (Mapbox Search)
+- **HOS Compliance**: Log events and compute daily summaries/violations
+- **Inspections**: Record pre‑trip and post‑trip inspections
+- **Reports**: Export trip PDFs and CSVs
+- **Docs**: OpenAPI schema and Swagger UI
+
+### Deployment Stack
+- Frontend: Hosted on GitHub Pages
+- Backend: Deployed via Render.com
 
 ---
 
-## Repository Layout
+## Technologies Used
 
-```
-backend/       # Django, DRF, apps: drivers, trips, logs
-frontend/      # React + TypeScript (Vite)
-infra/         # docker-compose for local dev
-```
+### Frontend
 
----
+- React 19 + TypeScript
+- Vite
+- MapLibre GL (OpenStreetMap raster basemap)
+- React Router
+- TailwindCSS
 
-## Tech Stack
+### Backend
 
-- Backend: Django 5, DRF, drf-spectacular, SimpleJWT, SQLite (dev)
-- Frontend: React 19 + TypeScript, Vite
-- Infra: Docker, Docker Compose
+- Django 5 + Django REST Framework
+- drf-spectacular (OpenAPI)
+- djangorestframework-simplejwt (JWT auth)
+- SQLite (dev)
+- cryptography (Fernet) for encrypting driver Mapbox tokens at rest
+- reportlab + WeasyPrint for PDF generation
+
+### Infra
+
+- Docker & Docker Compose (local dev and staging compose)
 
 ---
 
 ## Quick Start (Docker)
 
-1. Prerequisites: Docker Desktop running.
+1. Prerequisite: Docker Desktop running.
 
-2. Create `infra/.env` and add a Fernet key used to encrypt driver Mapbox tokens at rest:
+2. Create `infra/.env` with a Fernet key used to encrypt driver Mapbox tokens stored by the backend:
 
 ```env
 MAPBOX_ENC_KEY=<your_fernet_key>
@@ -96,18 +112,28 @@ VITE_API_URL=http://localhost:8000 npm run dev
 
 ---
 
-## Environment Variables
+## Configuration
+
+### Environment Variables
 
 - Backend
-
-  - `MAPBOX_ENC_KEY` (required): base64 Fernet key; encrypts stored Mapbox token
-  - `DJANGO_SETTINGS_MODULE` (dev default: `core.settings`)
-  - `DEBUG` (`1` in dev compose)
-
+  - `MAPBOX_ENC_KEY` (required): base64 Fernet key; used to encrypt stored Mapbox tokens
+  - `DJANGO_SETTINGS_MODULE` (default: `core.settings`)
+  - `DEBUG` (`1` for local, `0` for prod)
 - Frontend
-  - `VITE_API_URL` (compose default: `http://localhost:8000`)
+  - `VITE_API_URL` (default in dev compose: `http://localhost:8000`)
 
-Secrets policy: do not commit secrets; use `.env` files locally and CI/hosted secrets in pipelines.
+Secrets policy: do not commit secrets. Use `.env` files locally and CI/hosted secrets in pipelines.
+
+---
+
+## Repository Layout
+
+```
+backend/       # Django (apps: drivers, trips, logs)
+frontend/      # React + TypeScript (Vite)
+infra/         # docker-compose for local and staging
+```
 
 ---
 
@@ -126,7 +152,7 @@ Driver Mapbox token (encrypted at rest):
 curl -X PUT \
   -H "Authorization: Bearer $ACCESS" \
   -H "Content-Type: application/json" \
-  -d '{"mapbox_api_key": "<mapbox_access_token>"}' \
+  -d '{"mapbox_api_key": "<mapbox_public_token>"}' \
   http://localhost:8000/api/drivers/profile/
 ```
 
@@ -134,32 +160,45 @@ Trips:
 
 - POST `/api/trips/` → create + compute a trip
 - GET `/api/trips/` → list trips
-- GET `/api/trips/{id}/` → detail: `route_geometry` (GeoJSON LineString), `route_metadata`
+- GET `/api/trips/{id}/` → detail includes `route_geometry` (GeoJSON LineString) and `route_metadata`
+- GET `/api/trips/searchbox/suggest/?q=...&session_token=...&limit=5`
+- GET `/api/trips/searchbox/retrieve/?id=...&session_token=...`
 
-Example create request:
+Logs & HOS:
 
-```bash
-ACCESS=<your_jwt_access>
-curl -s -X POST \
-  -H "Authorization: Bearer $ACCESS" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "current_location": "-118.2437,34.0522",
-    "pickup_location": "-115.1398,36.1699",
-    "dropoff_location": "-104.9903,39.7392"
-  }' \
-  http://localhost:8000/api/trips/
-```
+- POST `/api/logs/` → create a log event
+- GET `/api/logs/{trip_id}/` → list trip log events
+- GET `/api/logs/{trip_id}/hos/` → HOS summary and violations
+- GET `/api/logs/{trip_id}/daily/` → daily log list
+- POST `/api/logs/{trip_id}/daily/submit/` → submit daily logs
+
+Inspections:
+
+- GET `/api/logs/{trip_id}/inspections/` → list inspections
+- POST `/api/logs/inspections/` → create inspection
+
+Reports:
+
+- GET `/api/reports/trip/{trip_id}/pdf/`
+- GET `/api/reports/trip/{trip_id}/csv/`
+
+Health:
+
+- GET `/healthz` → `200 ok`
 
 Swagger UI: `http://localhost:8000/api/docs/` (OpenAPI at `/api/schema/`).
 
 ---
 
-## Frontend Usage
+## Using the App
 
-1. Login from the app (JWT stored in memory).
-2. Provide your Mapbox access token in Profile Settings when prompted.
-3. Use Trip Planner to create a route; the map will display the polyline and key markers; the sidebar shows turn-by-turn steps.
+1. Sign up or log in from the frontend.
+2. Open Profile Settings and paste your Mapbox Default public token (`pk.*`).
+3. Plan a trip with pickup and dropoff; the map displays the route and key markers.
+4. Add log events during the trip; review HOS summaries and violations.
+5. Record pre/post‑trip inspections; export reports (PDF/CSV) as needed.
+
+Note: The map basemap uses OpenStreetMap tiles (no key needed). Your Mapbox token is used by the backend for directions/search and is stored encrypted using your `MAPBOX_ENC_KEY`.
 
 ---
 
@@ -169,7 +208,7 @@ Swagger UI: `http://localhost:8000/api/docs/` (OpenAPI at `/api/schema/`).
 - Backend tests: `cd backend && python manage.py test`
 - Frontend lint: `cd frontend && npm run lint`
 
-Target quality (repo policy): typed code, lint clean, and ≥70% coverage for non-trivial features.
+Quality target: typed code, lint clean, and ≥70% coverage for non‑trivial features.
 
 ---
 
@@ -179,70 +218,90 @@ Target quality (repo policy): typed code, lint clean, and ≥70% coverage for no
 - Commit style: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`)
 - Pull Requests:
   - Required checks: lint, test, build
-  - Required approvals: 1; auto-merge disabled
+  - Required approvals: 1; auto‑merge disabled
   - Include run instructions and tests list in PR description
 
-CI: GitHub Actions workflows run lint/test/build for backend and frontend. Use repo/organization secrets for environment variables.
+CI: GitHub Actions workflows can run lint/test/build for backend and frontend. Use organization secrets for environment variables.
 
 ---
 
 ## Deployment
 
-Images are built for production and can be pushed to GHCR using the `deploy_to_staging` workflow.
+Images can be built for production and pushed to a registry (e.g., GHCR).
 
-- Backend image: `ghcr.io/<owner>/ELD-backend`
-- Frontend image: `ghcr.io/<owner>/ELD-frontend`
+- Backend image: `ghcr.io/<owner>/eld-backend`
+- Frontend image: `ghcr.io/<owner>/eld-frontend`
+
+### Deployed Environments
+
+- Production
+  - Frontend: `https://<your-prod-frontend-url>`
+  - API base: `https://<your-prod-api-url>` or same-origin `/api`
+  - Swagger UI: `https://<your-prod-api-url>/api/docs/`
+  - Health: `https://<your-prod-api-url>/healthz`
+- Staging
+  - Frontend: `https://<your-staging-frontend-url>`
+  - API base: `https://<your-staging-api-url>` or same-origin `/api`
+  - Swagger UI: `https://<your-staging-api-url>/api/docs/`
+  - Health: `https://<your-staging-api-url>/healthz`
+
+Frontend config:
+- Same-origin deploys (recommended): set `VITE_API_URL=/api` (as in `infra/docker-compose.prod.yml`).
+- Split domains: set `VITE_API_URL` to your API base URL (e.g., `https://api.example.com`).
 
 ### Health Check
 
 - `GET /healthz` should return `200 ok` when backend is healthy.
 
-### Build & Push (manual)
-
-From repo root:
+### Build & Run (local images)
 
 ```bash
+# From repo root
 # Backend
-docker build -f backend/Dockerfile -t ghcr.io/<owner>/ELD-backend:local .
+docker build -f backend/Dockerfile -t ghcr.io/<owner>/eld-backend:local .
 # Frontend
-docker build -f frontend/Dockerfile -t ghcr.io/<owner>/ELD-frontend:local .
+docker build -f frontend/Dockerfile -t ghcr.io/<owner>/eld-frontend:local .
 ```
 
 ### Staging Compose
 
-Use `infra/docker-compose.prod.yml` to run images locally in production mode:
+Use `infra/docker-compose.prod.yml` to run prebuilt images locally in production mode:
 
 ```bash
 docker compose -f infra/docker-compose.prod.yml up -d
 ```
 
-### GitHub Actions
-
-- `deploy_to_staging` (`.github/workflows/deploy.yml`): builds and pushes Docker images to GHCR under the repo.
-- `security_scans` (`.github/workflows/security.yml`): runs `pip-audit` and `npm audit` on a schedule.
-
-### Rollback Procedure
-
-1. Identify last known good image tag in GHCR (e.g., `sha-<commit>`).
-2. Update deployment to use the previous tag.
-3. Restart services (Kubernetes: rollout restart; Docker Compose: `docker compose pull && docker compose up -d`).
-4. Verify `GET /healthz` and basic flows.
-
 ### Environment & Secrets
 
 - Do not commit secrets. Configure:
-  - `MAPBOX_ENC_KEY` (backend) as a secret/variable in the environment.
-  - Frontend `VITE_API_URL` pointing to the API ingress/URL.
+  - `MAPBOX_ENC_KEY` (backend) as a secret/variable in the environment
+  - Frontend `VITE_API_URL` pointing to the API ingress/URL
 
 ---
+
 ## Troubleshooting
 
-- Backend says `MAPBOX_ENC_KEY is not set` → set it in `infra/.env` (Docker) or export in your shell.
-- Mapbox call fails with a network error → check VPN/Internet; retry; ensure token is valid.
+- Backend says `MAPBOX_ENC_KEY is not set` → ensure it is set in `infra/.env` (Docker) or exported in your shell.
+- Mapbox request fails → verify your `pk.*` token is valid; check connectivity.
 - Frontend cannot reach API → verify `VITE_API_URL` and CORS allows `http://localhost:5173`.
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch:
+   ```bash
+   git checkout -b feature/short-description
+   ```
+3. Commit changes:
+   ```bash
+   git commit -m "feat: add <thing>"
+   ```
+4. Push branch and open a pull request
 
 ---
 
 ## License
 
-TBD.
+Released under the MIT License. See [`LICENSE`](./LICENSE) for details.

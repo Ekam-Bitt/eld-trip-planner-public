@@ -310,9 +310,20 @@ class TripReportPDFView(APIView):
             size = len(graph_data_url) if graph_data_url else 0
             logger.debug("Using single-day approach with graph_data_url: %d chars", size)
 
-        # Format locations as City, State (FMCSA compliant)
-        from_location_formatted = self._format_location(trip.pickup_location)
-        to_location_formatted = self._format_location(trip.dropoff_location)
+        # Format locations using labels from route metadata when available, fallback to coordinates
+        meta = trip.route_metadata or {}
+
+        def _format_named(loc_str: str | None, label: str | None) -> str:
+            if label:
+                if loc_str and ("," in loc_str):
+                    return f"{label} ({loc_str})"
+                return label
+            return self._format_location(loc_str)
+
+        from_location_formatted = _format_named(
+            trip.pickup_location, meta.get("pickup_label") or meta.get("origin_label")
+        )
+        to_location_formatted = _format_named(trip.dropoff_location, meta.get("dropoff_label"))
 
         # Format home terminal time (FMCSA compliant)
         home_terminal_time = self._format_home_terminal_time(profile.time_zone)

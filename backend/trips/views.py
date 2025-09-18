@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 from math import asin, cos, radians, sin, sqrt
 from typing import Any
@@ -8,6 +9,7 @@ from requests.adapters import HTTPAdapter
 from requests.exceptions import ConnectionError as ReqConnectionError, RequestException
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from urllib3.exceptions import NameResolutionError
 from urllib3.util.retry import Retry
 
@@ -74,9 +76,137 @@ class TripListCreateView(generics.ListCreateAPIView):
         api_key = decrypt_value(user.mapbox_api_key_encrypted)
 
         data = serializer.validated_data
-        current_location = data["current_location"]
-        pickup_location = data["pickup_location"]
-        dropoff_location = data["dropoff_location"]
+
+        def _normalize_coordinates(s: str) -> str | None:
+            parts = [p.strip() for p in s.split(",")]
+            if len(parts) != 2:
+                return None
+            try:
+                a = float(parts[0])
+                b = float(parts[1])
+            except Exception:
+                return None
+            # a=lon, b=lat
+            if -180.0 <= a <= 180.0 and -90.0 <= b <= 90.0:
+                return f"{a},{b}"
+            # a=lat, b=lon (flip)
+            if -90.0 <= a <= 90.0 and -180.0 <= b <= 180.0:
+                return f"{b},{a}"
+            return None
+
+        # Generate a session_token to group Search Box requests
+        session_token = str(uuid.uuid4())
+
+        def _geocode_to_lonlat(query: str) -> tuple[str, str | None]:
+            # If coordinates provided (lon,lat or lat,lon), normalize and pass through
+            norm = _normalize_coordinates(query)
+            if norm is not None:
+                return norm, None
+            # Use Mapbox Search Box API (forward geocoding)
+            # Minimal safety: URL encode handled via params
+            sb_url = "https://api.mapbox.com/search/searchbox/v1/suggest"
+            sb_params = {
+                "q": query,
+                "access_token": api_key,
+                "limit": 1,
+                "session_token": session_token,
+            }
+            try:
+                r = requests.get(sb_url, params=sb_params, timeout=10)
+                if r.status_code == 200:
+                    js = r.json()
+                    if js.get("suggestions"):
+                        sid = js["suggestions"][0].get("mapbox_id")
+                        if sid:
+                            det_url = "https://api.mapbox.com/search/searchbox/v1/retrieve"
+                            det = requests.get(
+                                det_url,
+                                params={
+                                    "id": sid,
+                                    "access_token": api_key,
+                                    "session_token": session_token,
+                                },
+                                timeout=10,
+                            )
+                            if det.status_code == 200:
+                                dj = det.json()
+                                feats = dj.get("features") or []
+                                if feats:
+                                    f0 = feats[0]
+                                    props = f0.get("properties", {}) if isinstance(f0, dict) else {}
+                                    # 1) geometry center
+                                    center = (
+                                        (f0.get("geometry", {}) or {}).get("coordinates")
+                                        if isinstance(f0.get("geometry", {}), dict)
+                                        else None
+                                    )
+                                    coords = None
+                                    if (
+                                        isinstance(center, list)
+                                        and len(center) == 2
+                                        and all(isinstance(x, (int, float)) for x in center)
+                                    ):
+                                        coords = center
+                                    else:
+                                        # 2) bbox midpoint
+                                        bbox = f0.get("bbox") or props.get("bbox")
+                                        if (
+                                            isinstance(bbox, list)
+                                            and len(bbox) == 4
+                                            and all(isinstance(x, (int, float)) for x in bbox)
+                                        ):
+                                            lon = (float(bbox[0]) + float(bbox[2])) / 2.0
+                                            lat = (float(bbox[1]) + float(bbox[3])) / 2.0
+                                            coords = [lon, lat]
+                                        else:
+                                            # 3) properties center/coordinates
+                                            alt = props.get("center") or props.get("coordinates")
+                                            if (
+                                                isinstance(alt, list)
+                                                and len(alt) == 2
+                                                and all(isinstance(x, (int, float)) for x in alt)
+                                            ):
+                                                coords = alt
+
+                                    if coords is not None:
+                                        label = (
+                                            props.get("name")
+                                            or props.get("place_name")
+                                            or f0.get("name")
+                                            or None
+                                        )
+                                        return f"{coords[0]},{coords[1]}", label
+            except Exception:
+                pass
+            # 4) Final fallback: Mapbox Geocoding API (permissive)
+            try:
+                from requests.utils import quote  # local import to avoid top-level costs
+
+                url_gc = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{quote(query)}.json"
+                gc = requests.get(url_gc, params={"access_token": api_key, "limit": 1}, timeout=10)
+                if gc.status_code == 200:
+                    jg = gc.json()
+                    feats = jg.get("features") or []
+                    if feats:
+                        f0 = feats[0]
+                        center = f0.get("center")
+                        if (
+                            isinstance(center, list)
+                            and len(center) == 2
+                            and all(isinstance(x, (int, float)) for x in center)
+                        ):
+                            label = f0.get("place_name") or f0.get("text")
+                            return f"{center[0]},{center[1]}", label
+            except Exception:
+                pass
+            # If still unresolved, raise error
+            raise ValueError(
+                f"Unable to geocode '{query}'. Enter coordinates 'lon,lat' or a more specific name."
+            )
+
+        current_location, current_label = _geocode_to_lonlat(data["current_location"])  # lon,lat
+        pickup_location, pickup_label = _geocode_to_lonlat(data["pickup_location"])  # lon,lat
+        dropoff_location, dropoff_label = _geocode_to_lonlat(data["dropoff_location"])  # lon,lat
         pickup_time = data.get("pickup_time")
         dropoff_time = data.get("dropoff_time")
 
@@ -221,6 +351,10 @@ class TripListCreateView(generics.ListCreateAPIView):
             "distance": route.get("distance"),
             "duration": route.get("duration"),
             "legs": route.get("legs"),
+            # human-friendly labels where available
+            "origin_label": current_label,
+            "pickup_label": pickup_label,
+            "dropoff_label": dropoff_label,
         }
 
         trip = Trip.objects.create(
@@ -268,3 +402,62 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
         response = super().delete(request, *args, **kwargs)
         response.data = None
         return response
+
+
+class SearchBoxSuggestView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):  # type: ignore[override]
+        user = request.user
+        assert hasattr(user, "mapbox_api_key_encrypted"), "Invalid user model"
+        if not user.mapbox_api_key_encrypted:
+            return Response({"detail": "Mapbox API key not set in profile"}, status=400)
+        api_key = decrypt_value(user.mapbox_api_key_encrypted)
+
+        q = request.query_params.get("q")
+        session_token = request.query_params.get("session_token")
+        if not q or not session_token:
+            return Response({"detail": "q and session_token are required"}, status=400)
+        try:
+            r = requests.get(
+                "https://api.mapbox.com/search/searchbox/v1/suggest",
+                params={
+                    "q": q,
+                    "access_token": api_key,
+                    "session_token": session_token,
+                    "limit": request.query_params.get("limit", 5),
+                },
+                timeout=10,
+            )
+        except RequestException:
+            return Response({"detail": "Failed to call Mapbox suggest"}, status=502)
+        return Response(r.json(), status=r.status_code)
+
+
+class SearchBoxRetrieveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):  # type: ignore[override]
+        user = request.user
+        assert hasattr(user, "mapbox_api_key_encrypted"), "Invalid user model"
+        if not user.mapbox_api_key_encrypted:
+            return Response({"detail": "Mapbox API key not set in profile"}, status=400)
+        api_key = decrypt_value(user.mapbox_api_key_encrypted)
+
+        mapbox_id = request.query_params.get("id")
+        session_token = request.query_params.get("session_token")
+        if not mapbox_id or not session_token:
+            return Response({"detail": "id and session_token are required"}, status=400)
+        try:
+            r = requests.get(
+                "https://api.mapbox.com/search/searchbox/v1/retrieve",
+                params={
+                    "id": mapbox_id,
+                    "access_token": api_key,
+                    "session_token": session_token,
+                },
+                timeout=10,
+            )
+        except RequestException:
+            return Response({"detail": "Failed to call Mapbox retrieve"}, status=502)
+        return Response(r.json(), status=r.status_code)

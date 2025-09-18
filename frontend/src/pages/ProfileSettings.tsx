@@ -77,38 +77,70 @@ export default function ProfileSettings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="font-semibold">Name</label>
-              <input className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                autoComplete="name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
             </div>
             <div>
               <label className="font-semibold">License #</label>
-              <input className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.license_no}
-                onChange={(e) => setForm((f) => ({ ...f, license_no: e.target.value }))} />
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                autoComplete="off"
+                value={form.license_no}
+                onChange={(e) => setForm((f) => ({ ...f, license_no: e.target.value }))}
+              />
             </div>
             <div>
               <label className="font-semibold">License State</label>
-              <input className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.license_state}
-                onChange={(e) => setForm((f) => ({ ...f, license_state: e.target.value }))} />
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                autoComplete="address-level1"
+                value={form.license_state}
+                onChange={(e) => setForm((f) => ({ ...f, license_state: e.target.value }))}
+              />
             </div>
             <div>
               <label className="font-semibold">Avg MPG</label>
-              <input type="number" step="0.01" className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.avg_mpg}
-                onChange={(e) => setForm((f) => ({ ...f, avg_mpg: e.target.value }))} />
+              <input
+                type="number"
+                step="0.01"
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                inputMode="decimal"
+                autoComplete="off"
+                value={form.avg_mpg}
+                onChange={(e) => setForm((f) => ({ ...f, avg_mpg: e.target.value }))}
+              />
             </div>
             <div>
               <label className="font-semibold">Terminal</label>
-              <input className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.terminal_name}
-                onChange={(e) => setForm((f) => ({ ...f, terminal_name: e.target.value }))} />
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                autoComplete="organization"
+                value={form.terminal_name}
+                onChange={(e) => setForm((f) => ({ ...f, terminal_name: e.target.value }))}
+              />
             </div>
             <div>
               <label className="font-semibold">Time Zone</label>
-              <input className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.time_zone}
-                onChange={(e) => setForm((f) => ({ ...f, time_zone: e.target.value }))} />
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                autoComplete="off"
+                value={form.time_zone}
+                onChange={(e) => setForm((f) => ({ ...f, time_zone: e.target.value }))}
+              />
             </div>
             <div>
               <label className="font-semibold">Units</label>
-              <select className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" value={form.units}
-                onChange={(e) => setForm((f) => ({ ...f, units: e.target.value as "miles" | "km" }))}>
+              <select
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                value={form.units}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, units: e.target.value as "miles" | "km" }))
+                }
+              >
                 <option value="miles">Miles</option>
                 <option value="km">Kilometers</option>
               </select>
@@ -120,6 +152,7 @@ export default function ProfileSettings() {
           <input
             className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
             placeholder={me?.has_mapbox_key ? "Key set — enter to replace" : "Enter Mapbox key"}
+            autoComplete="off"
             value={form.mapbox_api_key}
             onChange={(e) => setForm((f) => ({ ...f, mapbox_api_key: e.target.value }))}
           />

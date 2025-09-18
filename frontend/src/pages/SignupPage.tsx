@@ -48,12 +48,15 @@ export default function SignupPage() {
           <input
             className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Name"
+            autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <input
             className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Email"
+            type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -61,24 +64,29 @@ export default function SignupPage() {
             className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Password"
             type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <input
             className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="License No"
+            autoComplete="off"
             value={licenseNo}
             onChange={(e) => setLicenseNo(e.target.value)}
           />
           <input
             className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Truck Type"
+            autoComplete="off"
             value={truckType}
             onChange={(e) => setTruckType(e.target.value)}
           />
           <input
             className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Avg MPG"
+            inputMode="decimal"
+            autoComplete="off"
             value={avgMpg}
             onChange={(e) => setAvgMpg(e.target.value)}
           />
