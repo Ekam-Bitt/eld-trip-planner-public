@@ -1,0 +1,23 @@
+.DS_Store
+
+# Python virtualenvs and caches
+.venv/
+venv/
+**/__pycache__/
+*.pyc
+
+# Node dependency/build artifacts
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Runtime storage
+apps/api/data/
+apps/api/data/*.db
+
+# Generated reports
+artifacts/latest/*.svg
+artifacts/latest/*.pdf
+artifacts/reports/*.svg
+artifacts/reports/*.pdf
+renderer/
