@@ -419,7 +419,7 @@ function AuthPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col justify-center px-4 py-5 sm:px-6 sm:py-10 lg:px-10">
       <div className="grid items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="order-2 lg:order-1">
+        <section>
           <div className="max-w-[640px]">
             <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">HOS Driver Log Platform</p>
             <h1 className="mt-4 text-4xl font-semibold leading-[1.05] text-slate-950 sm:text-5xl">
@@ -457,7 +457,7 @@ function AuthPage({
           </div>
         </section>
 
-        <section className="order-1 lg:order-2">
+        <section>
           <div className="mx-auto max-w-[520px] rounded-[32px] border border-slate-200 bg-white/96 p-5 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.42)] backdrop-blur sm:p-7">
             <div className="mb-6 flex items-center justify-between">
               <div>

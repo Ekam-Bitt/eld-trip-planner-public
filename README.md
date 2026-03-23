@@ -41,10 +41,9 @@ eld-adv/
 ## Quick Start
 
 ```bash
-cd /Users/ekambitt/Projects/eld-adv
+git clone <repository_url> && cd eld-trip-planner-public
 make setup
-make api
-make web
+make dev
 ```
 
 Then open [http://127.0.0.1:5173](http://127.0.0.1:5173).
@@ -54,18 +53,19 @@ Then open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 ### API
 
 ```bash
-cd /Users/ekambitt/Projects/eld-adv/apps/api
+cd apps/api
 python3 -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
-python manage.py check
+python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
 
 ### Web
 
 ```bash
-cd /Users/ekambitt/Projects/eld-adv/apps/web
+cd apps/web
 npm install
 npm run dev
 ```
@@ -81,17 +81,12 @@ By default, the web dev server proxies `/api` to `http://127.0.0.1:8000`, so no 
 ## Makefile Shortcuts
 
 ```bash
-cd /Users/ekambitt/Projects/eld-adv
-make help
-make setup
-make api-setup
-make api-check
-make api-shell
-make web-install
-make api
-make web
-make test
-make build
+make help            # List available commands
+make setup           # Fully automate venv, migrations, and npm installs
+make dev             # Start both Django API and React Frontend concurrently
+make test            # Run backend unit tests
+make build           # Run checks and build production assets
+make clean-all       # Completely reset local environment (venv, DB, node_modules)
 ```
 
 Open the frontend at `http://127.0.0.1:5173` (fixed host/port, strict port mode).
@@ -148,7 +143,6 @@ The onboarding fields are locked after submission for the assessment flow. HOS r
 Backend checks:
 
 ```bash
-cd /Users/ekambitt/Projects/eld-adv
 make api-check
 make test
 ```
@@ -156,6 +150,5 @@ make test
 Production build:
 
 ```bash
-cd /Users/ekambitt/Projects/eld-adv
 make build
 ```

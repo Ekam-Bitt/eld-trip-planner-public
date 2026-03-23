@@ -13,7 +13,7 @@ PORT ?= 8000
 WEB_HOST ?= 127.0.0.1
 WEB_PORT ?= 5173
 
-.PHONY: help setup api-setup api-install api-check api-shell api web-install web test build clean-artifacts clean
+.PHONY: help setup api-setup api-install api-check api-shell api web-install web dev test build clean-artifacts clean clean-all
 
 help:
 	@echo "Available targets:"
@@ -25,6 +25,7 @@ help:
 	@echo "  make api             Start Django dev server"
 	@echo "  make web-install     Install frontend dependencies"
 	@echo "  make web             Start frontend dev server"
+	@echo "  make dev             Start both API and frontend concurrently"
 	@echo "  make test            Run backend unit tests"
 	@echo "  make build           Run backend compile checks + frontend production build"
 	@echo "  make clean-artifacts Remove generated SVG/PDF artifacts"
@@ -34,7 +35,9 @@ setup: api-setup web-install
 
 api-setup:
 	cd $(API_DIR) && python3 -m venv .venv
+	$(API_PIP) install --upgrade pip
 	$(API_PIP) install -r $(API_DIR)/requirements.txt
+	cd $(API_DIR) && $(abspath $(API_PYTHON)) manage.py migrate
 
 api-install:
 	@if [ ! -x "$(API_PIP)" ]; then \
@@ -70,6 +73,10 @@ web-install:
 web:
 	cd $(WEB_DIR) && $(WEB_NPM) run dev -- --host $(WEB_HOST) --port $(WEB_PORT) --strictPort
 
+dev:
+	@echo "Starting API and Frontend..."
+	@(make api & make web & wait)
+
 test:
 	@if [ ! -x "$(API_PYTHON)" ]; then \
 		echo "Missing $(API_PYTHON). Run 'make api-setup' first."; \
@@ -97,3 +104,6 @@ clean-artifacts:
 
 clean:
 	rm -rf $(WEB_DIR)/dist $(WEB_DIR)/.vite
+
+clean-all: clean clean-artifacts
+	rm -rf $(API_VENV) $(WEB_DIR)/node_modules $(API_DIR)/data/django.sqlite3
