@@ -1,154 +1,94 @@
-# HOS Driver Log Platform
+# ELD Trip Planner Platform
 
-Production-oriented monorepo for generating FMCSA-style driver daily logs, enforcing HOS recap compliance, and planning assessment-ready trips with a Django + React stack.
+[![CI Build](https://img.shields.io/github/actions/workflow/status/Ekam-Bitt/eld-trip-planner-public/ci.yml?branch=main&style=for-the-badge)](https://github.com/Ekam-Bitt/eld-trip-planner-public/actions/workflows/ci.yml)
+![Status: Production](https://img.shields.io/badge/Status-Production--Ready-success?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-5.1-092E20?style=for-the-badge&logo=django)
+![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel)
+![Render](https://img.shields.io/badge/Render-Deployed-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 
-## Stack
+🚀 **Live Demo:** [https://eld-trip-planner-kohl.vercel.app/](https://eld-trip-planner-kohl.vercel.app/)
 
-- Backend: Django
-- Frontend: React + Vite + Tailwind
-- Storage: SQLite
-- Rendering: SVG template fill + PDF export via CairoSVG
-- Routing: OpenStreetMap geocoding/routing services with local fallbacks
+A production-ready, industry-standard monorepo for generating FMCSA-compliant driver daily logs, enforcing Hours of Service (HOS) recap compliance, and planning trips. This platform combines a deeply optimized Django backend with a blazingly fast React + Vite frontend.
 
-## Repository Layout
+## 🌟 Key Features
+
+- **HOS Compliance Engine**: Robust backend calculation of daily limits, cycle caps (70-hour / 8-day), and restart streaks.
+- **Automated Log Generation**: Dynamically rendering complex, multi-day FMCSA-compliant logbooks to SVG and PDF using CairoSVG.
+- **Intelligent Trip Planning**: Calculates distance, routes, and rest stops seamlessly utilizing OpenStreetMap routing parameters.
+- **Driver-First UX**: Locked onboarding profiles ensure consistent carrier, terminal, and equipment details across logs without redundant data entry.
+- **Secure Architecture**: RESTful endpoints protected by robust cross-origin authenticated session management.
+
+## 🏗️ Architecture
+
+The repository uses a clear separation of concerns under a standard monorepo design:
 
 ```text
 eld-adv/
-  apps/
-    api/                  # Django backend + shared planning/rendering modules
-    web/                  # React + Tailwind frontend
-  assets/
-    templates/            # Frozen SVG templates
-  artifacts/
-    latest/               # Latest generated SVG/PDF (compatibility outputs)
-    reports/              # Per-record generated SVG/PDF artifacts
-  docs/
-    assessment.md
+├── apps/
+│   ├── api/                  # Django backend + core compliance & trip planning modules
+│   └── web/                  # React + Tailwind frontend built with Vite
+├── assets/
+│   └── templates/            # Frozen FMCSA SVG log templates
+└── artifacts/
+    ├── reports/              # Per-record generated SVG/PDF artifacts
+    └── latest/               # Latest generated compatibility outputs
 ```
 
-## Core Features
+## 🚀 Quick Start (Local Development)
 
-- Driver-first authentication with sign up, login, and locked onboarding
-- Backend-owned HOS recap and compliance calculation
-- Timeline rendering into `<g id="timeline-events">` in the SVG dynamic layer
-- Assessment-aligned trip planner:
-  - Inputs: current location, pickup, dropoff, current cycle used hours
-  - Outputs: route instructions, stop/rest plan, and multi-day generated log sheets
-- Locked onboarding fields mapped from the PDF template: carrier name, office address, terminal address, and equipment numbers
-- Secure per-record artifact access (`/api/logs/{id}/svg|pdf`)
-- Focused frontend UX for sign up, onboarding, and trip generation
-
-## Quick Start
+The repository provides a streamlined `Makefile` interface for rapid local provisioning.
 
 ```bash
 git clone <repository_url> && cd eld-trip-planner-public
 make setup
 make dev
 ```
+Navigate to [http://127.0.0.1:5173](http://127.0.0.1:5173) to view the application in strict-port UI mode. The backend runs concurrently on HTTP port `8000` with requests automatically proxied by Vite.
 
-Then open [http://127.0.0.1:5173](http://127.0.0.1:5173).
+### Manual Setup (Without Make)
 
-## Local Setup
-
-### API
-
+**Backend (Django)**
 ```bash
 cd apps/api
 python3 -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
 
-### Web
-
+**Frontend (React)**
 ```bash
 cd apps/web
 npm install
 npm run dev
 ```
 
-Optional API override:
+## 🌍 Production Deployment
+
+The project is natively architected for split-tier serverless and instance execution.
+
+- **Frontend (Vercel)**: Ensure Vercel build configuration executes `npm run build` within the `/apps/web` root directory. Provide the `VITE_API_BASE_URL` pointing strictly to your live API instance.
+- **Backend (Render)**: Utilizes a native Python environment (`env: python`). A declarative `render.yaml` infrastructure-as-code file automates zero-downtime backend deployments alongside automated database migrations.
+
+## 📡 API Reference
+
+A highly decoupled REST architecture orchestrates the workflows:
+- `POST /api/auth/signup` / `POST /api/auth/login` / `POST /api/auth/logout`
+- `PUT /api/profile` - Locks in permanent carrier/onboarding details
+- `POST /api/trips/plan` - Computes and returns structured route definitions
+- `POST /api/trips/generate` - Produces and persists the SVG/PDF assets to the internal file system
+- `GET /api/logs/{id}/svg` / `GET /api/logs/{id}/pdf` - Emits `FileResponse` binaries for reporting endpoints
+
+## 🛠️ Verification & Quality Assurance
+
+Ensure codebase strictness and continuous integration checks before committing:
 
 ```bash
-VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
-```
-
-By default, the web dev server proxies `/api` to `http://127.0.0.1:8000`, so no CORS config is needed for local development.
-
-## Makefile Shortcuts
-
-```bash
-make help            # List available commands
-make setup           # Fully automate venv, migrations, and npm installs
-make dev             # Start both Django API and React Frontend concurrently
-make test            # Run backend unit tests
-make build           # Run checks and build production assets
-make clean-all       # Completely reset local environment (venv, DB, node_modules)
-```
-
-Open the frontend at `http://127.0.0.1:5173` (fixed host/port, strict port mode).
-
-## Driver Flow
-
-1. Create a driver account or sign in.
-2. Complete the one-time onboarding fields:
-   - Name of carrier
-   - Main office address
-   - Home terminal address
-   - Truck / trailer numbers
-3. Enter:
-   - Current Location
-   - Pickup Location
-   - Dropoff Location
-   - Current Cycle Used (hours)
-4. Click **Plan Route + Stops** for route + stop instructions.
-5. Click **Generate Multi-Day Logs** to create one SVG/PDF daily log per trip day.
-
-The onboarding fields are locked after submission for the assessment flow. HOS recap history is derived by the backend rather than being entered manually.
-
-## Project Practices
-
-- Treat the backend as Django-only. There is no FastAPI runtime in the repo anymore.
-- Keep one-time carrier fields in onboarding and do not ask for them again in the trip planner.
-- Keep the assessment input surface narrow: current location, pickup, dropoff, and current cycle used hours.
-- Prefer `make setup`, `make api`, `make web`, `make test`, and `make build` for routine local work.
-
-## Trip APIs
-
-- `POST /api/auth/signup`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `GET /api/profile`
-- `PUT /api/profile`
-- `POST /api/trips/plan`
-- `POST /api/trips/generate`
-- `GET /api/logs/{id}/svg`
-- `GET /api/logs/{id}/pdf`
-
-## Environment Variables
-
-- `DRIVER_LOG_TEMPLATE` (default: `assets/templates/driver-log-template.svg`)
-- `DRIVER_LOG_DB_PATH` (default: `apps/api/data/driver_log.db`)
-- `HOS_STRICT_COMPLIANCE`
-- `AUTH_PBKDF2_ITERATIONS`
-- `AUTH_SESSION_TTL_HOURS`
-- `LOG_LEVEL`
-
-## Verification
-
-Backend checks:
-
-```bash
-make api-check
-make test
-```
-
-Production build:
-
-```bash
-make build
+make test        # Ensure comprehensive unit test passthrough
+make api-check   # Validate Django integrity and code linters
+make build       # Build optimized React production bundles 
 ```

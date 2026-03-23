@@ -1,0 +1,58 @@
+name: CI Validation Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  backend-validation:
+    name: Django Backend Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: 'pip'
+
+      - name: Setup Backend Environment
+        run: make api-setup
+
+      - name: Run Django System Checks
+        run: make api-check
+
+      - name: Run Unit Tests
+        run: make test
+
+      - name: Verify Python Compilation
+        run: |
+          source apps/api/.venv/bin/activate
+          python -m py_compile apps/api/*.py apps/api/django_api/*.py
+
+  frontend-validation:
+    name: React Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: make web-install
+
+      - name: Run Production Build
+        working-directory: apps/web
+        run: npm run build
