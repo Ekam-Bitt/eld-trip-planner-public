@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: django-api
+    env: python
+    region: oregon 
+    buildCommand: "cd apps/api && pip install -r requirements.txt && python manage.py migrate"
+    startCommand: "cd apps/api && gunicorn django_api.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "*"
