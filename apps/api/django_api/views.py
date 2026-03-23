@@ -98,8 +98,8 @@ def build_auth_response(user, *, status: int = 200) -> JsonResponse:
         SESSION_COOKIE_NAME,
         session.token,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
         max_age=24 * 60 * 60,
     )
     return response
@@ -190,7 +190,7 @@ def auth_logout(request: HttpRequest) -> JsonResponse:
         delete_session(DB_PATH, token)
 
     response = JsonResponse({"ok": True})
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    response.delete_cookie(SESSION_COOKIE_NAME, samesite="none", secure=True)
     return response
 
 
