@@ -41,5 +41,12 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+    r"^http://localhost:.*$",
+    r"^http://127\.0\.0\.1:.*$",
+]
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
